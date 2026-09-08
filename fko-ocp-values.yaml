@@ -1,0 +1,14 @@
+# OpenShift security settings for Flink Kubernetes Operator.
+# Do not set a fixed UID/GID; the namespace SCC assigns valid values.
+podSecurityContext:
+  runAsUser: null
+  runAsGroup: null
+resources:
+  requests:
+    cpu: "2"
+    memory: 3Gi
+  limits:
+    cpu: "2"
+    memory: 3Gi
+watchNamespaces:
+  - flink

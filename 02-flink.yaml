@@ -1,0 +1,54 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: CMFRestClass
+metadata:
+  name: default
+  namespace: flink
+spec:
+  endpoint: http://confluent-manager-for-apache-flink.operator.svc.cluster.local:80
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: FlinkEnvironment
+metadata:
+  name: default
+  namespace: flink
+spec:
+  kubernetesNamespace: flink
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flink
+  namespace: flink
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: FlinkApplication
+metadata:
+  name: flink-app
+  namespace: flink
+spec:
+  flinkEnvironment: default
+  cmfRestClassRef:
+    name: default
+    namespace: flink
+  image: ${FLINK_IMAGE}
+  flinkVersion: ${FLINK_VERSION}
+  serviceAccount: flink
+  jobManager:
+    podTemplate:
+      # OpenShift default SCC assigns UID/GID; do not set fixed values here.
+      podSecurityContext: {}
+    resource:
+      cpu: 1
+      memory: 1024m
+  taskManager:
+    podTemplate:
+      # OpenShift default SCC assigns UID/GID; do not set fixed values here.
+      podSecurityContext: {}
+    resource:
+      cpu: 1
+      memory: 1024m
+  job:
+    jarURI: local:///opt/flink/examples/streaming/StateMachineExample.jar
+    state: running
+    parallelism: 1
+    upgradeMode: stateless

@@ -1,0 +1,173 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: KRaftController
+metadata:
+  name: kraftcontroller
+  namespace: confluent
+spec:
+  # OpenShift default SCC assigns UID/GID; do not set fixed values here.
+  podTemplate:
+    podSecurityContext: {}
+  replicas: 3
+  dataVolumeCapacity: 64Gi
+  resources:
+    requests:
+      cpu: "3"
+      memory: 4Gi
+    limits:
+      cpu: "3"
+      memory: 4Gi
+  tls:
+    secretRef: ${KRAFT_TLS_SECRET}
+  image:
+    application: ${REGISTRY}/confluentinc/cp-server:${CP_VERSION}
+    init: ${REGISTRY}/confluentinc/confluent-init-container:${INIT_VERSION}
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: Kafka
+metadata:
+  name: kafka
+  namespace: confluent
+spec:
+  # OpenShift default SCC assigns UID/GID; do not set fixed values here.
+  podTemplate:
+    podSecurityContext: {}
+  replicas: 3
+  dataVolumeCapacity: 1Ti
+  resources:
+    requests:
+      cpu: "4"
+      memory: 16Gi
+    limits:
+      cpu: "4"
+      memory: 16Gi
+  tls:
+    secretRef: ${KAFKA_TLS_SECRET}
+  image:
+    application: ${REGISTRY}/confluentinc/cp-server:${CP_VERSION}
+    init: ${REGISTRY}/confluentinc/confluent-init-container:${INIT_VERSION}
+  dependencies:
+    kRaftController:
+      clusterRef:
+        name: kraftcontroller
+  listeners:
+    external:
+      tls:
+        enabled: true
+      externalAccess:
+        type: route
+        route:
+          domain: ${OCP_ROUTE_DOMAIN}
+          bootstrapPrefix: kafka
+          brokerPrefix: b
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: Connect
+metadata:
+  name: connect
+  namespace: confluent
+spec:
+  # OpenShift default SCC assigns UID/GID; do not set fixed values here.
+  podTemplate:
+    podSecurityContext: {}
+  replicas: 2
+  resources:
+    requests:
+      cpu: "4"
+      memory: 16Gi
+    limits:
+      cpu: "4"
+      memory: 16Gi
+  image:
+    application: ${REGISTRY}/confluentinc/cp-server-connect:${CP_VERSION}
+    init: ${REGISTRY}/confluentinc/confluent-init-container:${INIT_VERSION}
+  tls:
+    secretRef: ${CONNECT_TLS_SECRET}
+  externalAccess:
+    type: route
+    route:
+      domain: ${OCP_ROUTE_DOMAIN}
+      prefix: connect
+  build:
+    type: onDemand
+    onDemand:
+      plugins:
+        confluentHub:
+          - name: kafka-connect-s3
+            owner: confluentinc
+            version: ${S3_PLUGIN_VERSION}
+          - name: kafka-connect-jdbc
+            owner: confluentinc
+            version: ${JDBC_PLUGIN_VERSION}
+          - name: mongodb-kafka-connect
+            owner: mongodb
+            version: ${MONGODB_PLUGIN_VERSION}
+      storageLimit: 50Gi
+  dependencies:
+    kafka:
+      bootstrapEndpoint: kafka.confluent.svc.cluster.local:9071
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: SchemaRegistry
+metadata:
+  name: schemaregistry
+  namespace: confluent
+spec:
+  # OpenShift default SCC assigns UID/GID; do not set fixed values here.
+  podTemplate:
+    podSecurityContext: {}
+  replicas: 2
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  image:
+    application: ${REGISTRY}/confluentinc/cp-schema-registry:${CP_VERSION}
+    init: ${REGISTRY}/confluentinc/confluent-init-container:${INIT_VERSION}
+  tls:
+    secretRef: ${SCHEMA_REGISTRY_TLS_SECRET}
+  externalAccess:
+    type: route
+    route:
+      domain: ${OCP_ROUTE_DOMAIN}
+      prefix: schemaregistry
+  dependencies:
+    kafka:
+      bootstrapEndpoint: kafka.confluent.svc.cluster.local:9071
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ControlCenter
+metadata:
+  name: controlcenter
+  namespace: confluent
+spec:
+  # OpenShift default SCC assigns UID/GID; do not set fixed values here.
+  podTemplate:
+    podSecurityContext: {}
+  replicas: 1
+  resources:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+  image:
+    application: ${REGISTRY}/confluentinc/cp-enterprise-control-center-next-gen:${CP_VERSION}
+    init: ${REGISTRY}/confluentinc/confluent-init-container:${INIT_VERSION}
+  dataVolumeCapacity: 200Gi
+  tls:
+    secretRef: ${CONTROL_CENTER_TLS_SECRET}
+  externalAccess:
+    type: route
+    route:
+      domain: ${OCP_ROUTE_DOMAIN}
+      prefix: controlcenter
+  dependencies:
+    schemaRegistry:
+      url: https://schemaregistry.confluent.svc.cluster.local:8081
+    connect:
+      - name: connect
+        url: https://connect.confluent.svc.cluster.local:8083

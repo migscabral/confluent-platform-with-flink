@@ -1,0 +1,35 @@
+# OpenShift security settings for Confluent Manager for Apache Flink.
+# OpenShift assigns UID/GID/fsGroup from the namespace range.
+podSecurity:
+  enabled: true
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: null
+    runAsGroup: null
+    fsGroup: null
+deployment:
+  replicas: 1
+  resources:
+    requests:
+      cpu: "2"
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+persistence:
+  enabled: true
+  size: 10Gi
+deploymentOverrides:
+  spec:
+    template:
+      spec:
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+          - name: cmf
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
